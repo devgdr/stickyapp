@@ -317,10 +317,8 @@ export default function App() {
     await saveNotes(updatedNotes);
     setShowEditor(false);
     
-    // Auto-sync on save
-    if (DropboxService.getInstance().isAuthenticated()) {
-        syncWithDropbox();
-    }
+    // Note: Sync will happen automatically via auto-sync interval
+    // No immediate sync to avoid rapid uploads
   };
 
   // Delete note (called after confirmation)

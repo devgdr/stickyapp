@@ -239,6 +239,93 @@ export class DropboxSyncManager {
     this.stopAutoSync();
   }
 
+  /**
+   * Refresh the access token using the refresh token
+   */
+  private async refreshAccessToken(): Promise<boolean> {
+    const refreshToken = store.get('refreshToken') as string;
+    const appKey = store.get('appKey') as string;
+
+    if (!refreshToken || !appKey) {
+      log('[AUTH] Cannot refresh: missing refresh token or app key');
+      return false;
+    }
+
+    try {
+      log('[AUTH] Refreshing access token...');
+      
+      const response = await fetch('https://api.dropboxapi.com/oauth2/token', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams({
+          grant_type: 'refresh_token',
+          refresh_token: refreshToken,
+          client_id: appKey,
+        }).toString(),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        log(`[AUTH] Token refresh failed: ${response.status} ${errorText}`);
+        // Clear invalid tokens
+        this.disconnect();
+        return false;
+      }
+
+      const result = await response.json() as {
+        access_token: string;
+        refresh_token?: string;
+      };
+
+      // Update stored tokens
+      store.set('accessToken', result.access_token);
+      if (result.refresh_token) {
+        store.set('refreshToken', result.refresh_token);
+      }
+
+      // Reinitialize Dropbox client with new token
+      this.dbx = new Dropbox({ accessToken: result.access_token, fetch: fetch });
+      log('[AUTH] Access token refreshed successfully');
+      
+      return true;
+    } catch (error) {
+      log(`[AUTH] Token refresh error: ${error}`);
+      this.disconnect();
+      return false;
+    }
+  }
+
+  /**
+   * Ensure we have a valid access token, refresh if needed
+   */
+  private async ensureValidToken(): Promise<boolean> {
+    const accessToken = store.get('accessToken') as string;
+    
+    if (!accessToken) {
+      return false;
+    }
+
+    // Try a lightweight API call to check if token is valid
+    try {
+      if (this.dbx) {
+        await this.dbx.usersGetCurrentAccount();
+        return true; // Token is valid
+      }
+    } catch (error: any) {
+      // Check if it's an auth error
+      if (error?.status === 401 || error?.error?.error_summary?.includes('expired')) {
+        log('[AUTH] Access token expired, attempting refresh...');
+        return await this.refreshAccessToken();
+      }
+      // Other errors - token might still be valid
+      return true;
+    }
+    
+    return false;
+  }
+
   private getNotesCallback: (() => Note[]) | null = null;
 
   /**
@@ -388,6 +475,16 @@ export class DropboxSyncManager {
     }
 
     try {
+      // Ensure we have a valid token before uploading
+      const hasValidToken = await this.ensureValidToken();
+      if (!hasValidToken) {
+        log('[SYNC] No valid token available, skipping upload');
+        return false;
+      }
+
+      // Get fresh access token
+      const accessToken = store.get('accessToken') as string;
+
       // Ensure /notes folder exists before uploading
       await this.ensureNotesFolder();
 
@@ -440,6 +537,11 @@ export class DropboxSyncManager {
     if (!accessToken) return false;
 
     try {
+      // Ensure valid token
+      const hasValidToken = await this.ensureValidToken();
+      if (!hasValidToken) return false;
+
+      const accessToken = store.get('accessToken') as string;
       log(`[SYNC] Deleting note ${noteId} from Dropbox...`);
       
       const response = await fetch('https://api.dropboxapi.com/2/files/delete_v2', {
@@ -533,23 +635,28 @@ export class DropboxSyncManager {
           remoteNoteIds.add(noteId);
           const localPath = path.join(this.localVaultPath, entry.name);
           
-          // Check if local file exists and compare timestamps
+          // Check if local file exists and compare YAML timestamps (not file mtime)
           let shouldDownload = true;
           try {
-            const localStat = await fs.stat(localPath);
-            const localModified = localStat.mtime;
-            const dropboxModified = new Date((entry as any).client_modified);
+            // Parse local note to get YAML updated timestamp
+            const localContent = await fs.readFile(localPath, 'utf-8');
+            const localNote = parseNote(localContent);
+            const localDate = new Date(localNote.updated);
+            const remoteDate = new Date((entry as any).client_modified);
             
-            if (localModified > dropboxModified) {
+            // Use 2-second buffer for timestamp comparison (matches mobile)
+            const timeDiff = Math.abs(remoteDate.getTime() - localDate.getTime());
+            
+            if (timeDiff < 2000) {
+              // Timestamps essentially the same, skip
+              shouldDownload = false;
+            } else if (localDate > remoteDate) {
               // Local is newer, don't download (will upload later)
               shouldDownload = false;
-            } else if (localModified.getTime() === dropboxModified.getTime()) {
-              // Same timestamp, skip
-              shouldDownload = false;
             }
-            // If Dropbox is newer, download
+            // If remote is newer by >2s, download
           } catch {
-            // Local file doesn't exist, download
+            // Local file doesn't exist or parse failed, download
           }
 
           if (shouldDownload) {
