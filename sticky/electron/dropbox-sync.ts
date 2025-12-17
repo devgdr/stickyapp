@@ -11,6 +11,7 @@ import * as fsSync from 'fs';
 import * as path from 'path';
 import * as crypto from 'crypto';
 import type { Note } from '@stickyvault/core';
+import { serializeNote, parseNote } from '@stickyvault/core';
 
 // Log file path - lazily initialized when app is ready
 let LOG_FILE: string | null = null;
@@ -363,7 +364,8 @@ export class DropboxSyncManager {
    * Calculate content hash for a note
    */
   private getContentHash(note: Note): string {
-    const content = `# ${note.title}\n\n${note.content}`;
+    // Use serialized format for hash consistency with actual file content
+    const content = serializeNote(note);
     return crypto.createHash('md5').update(content).digest('hex');
   }
 
@@ -389,8 +391,8 @@ export class DropboxSyncManager {
       // Ensure /notes folder exists before uploading
       await this.ensureNotesFolder();
 
-      // Construct markdown content from note object directly
-      const markdown = `# ${note.title}\n\n${note.content}`;
+      // Use core library serialization for YAML frontmatter format
+      const markdown = serializeNote(note);
       const content = Buffer.from(markdown, 'utf-8');
       
       log(`[SYNC] Uploading note ${note.id} to Dropbox...`);
