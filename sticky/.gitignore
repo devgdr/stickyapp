@@ -1,0 +1,13 @@
+# Desktop/Electron specific
+dist/
+dist-electron/
+release/
+*.dmg
+*.exe
+*.AppImage
+*.deb
+*.rpm
+*.snap
+*.msi
+build/
+out/

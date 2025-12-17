@@ -1,0 +1,19 @@
+# Mobile specific
+.expo/
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.orig.*
+web-build/
+android/.gradle/
+android/app/build/
+android/build/
+android/.cxx/
+ios/Pods/
+ios/build/
+*.apk
+*.aab
+*.ipa
+eas.json

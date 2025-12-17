@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=StickyVault
+Comment=Modern sticky notes app
+Exec=/usr/bin/electron /mnt/localhost/__Project/___reallone/phone/stickynote/packages/desktop
+Icon=/mnt/localhost/__Project/___reallone/phone/stickynote/packages/desktop/assets/icon.png
+Terminal=false
+Type=Application
+Categories=Utility;Office;
+StartupWMClass=StickyVault

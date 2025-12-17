@@ -1,0 +1,121 @@
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Build outputs
+dist/
+build/
+release/
+release1/
+dist-electron/
+dist-electron-ts/
+out/
+*.tgz
+*.tsbuildinfo
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+logs/
+*.log
+
+# Cache
+.cache/
+.npm/
+.eslintcache
+
+# Test
+coverage/
+
+# Expo/React Native
+.expo/
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.orig.*
+web-build/
+
+# Gradle/Android
+*.apk
+*.aab
+android/.gradle/
+android/app/build/
+android/build/
+
+# Electron
+dist-electron/
+*.dmg
+*.exe
+*.AppImage
+*.deb
+*.rpm
+
+# Secrets
+*.pem
+secrets/
+
+
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+build/
+*.tsbuildinfo
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Dropbox credentials (NEVER commit)
+.dropbox/
+
+# Android
+packages/android/.gradle/
+packages/android/build/
+packages/android/app/build/
+packages/android/local.properties
+*.apk
+*.aab
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# Test coverage
+coverage/
+
+# Electron
+packages/desktop/out/
+packages/desktop/release/
