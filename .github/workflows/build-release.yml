@@ -17,28 +17,26 @@ jobs:
         working-directory: mobile
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: mobile/package-lock.json
-      
+          node-version: "20"
+
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
-          distribution: 'temurin'
-          java-version: '17'
-      
+          distribution: "temurin"
+          java-version: "17"
+
       - name: Install dependencies
-        run: npm ci
-      
+        run: npm install
+
       - name: Build Android APK
         run: |
           cd android
           ./gradlew assembleRelease
-      
+
       - name: Upload Android Artifact
         uses: actions/upload-artifact@v4
         with:
@@ -59,34 +57,34 @@ jobs:
     runs-on: ${{ matrix.os }}
     defaults:
       run:
-        working-directory: desktop
+        working-directory: sticky
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: desktop/package-lock.json
-      
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: sticky/package-lock.json
+
       - name: Install dependencies
         run: npm ci
-      
+
       - name: Build Desktop App
         run: npm run build
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      
+
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
           name: desktop-${{ matrix.platform }}
           path: |
-            desktop/release/*.exe
-            desktop/release/*.dmg
-            desktop/release/*.AppImage
-            desktop/release/*.deb
+            sticky/release/*.exe
+            sticky/release/*.dmg
+            sticky/release/*.AppImage
+            sticky/release/*.deb
 
   # Create Pre-Release
   release:
@@ -94,16 +92,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
           path: artifacts
-      
+
       - name: Get short SHA
         id: sha
         run: echo "short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
-      
+
       - name: Create Pre-Release
         uses: softprops/action-gh-release@v2
         with:
