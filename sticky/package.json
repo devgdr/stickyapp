@@ -4,6 +4,10 @@
   "description": "StickyVault Desktop App - Linux & Windows",
   "author": "StickyVault Team",
   "homepage": "https://github.com/stickyvault/stickyvault",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/stickyvault/stickyapp.git"
+  },
   "main": "dist-electron/main.js",
   "scripts": {
     "dev": "vite",
