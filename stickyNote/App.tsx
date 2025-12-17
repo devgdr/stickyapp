@@ -17,6 +17,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Crypto from 'expo-crypto';
 
 const { WidgetModule } = NativeModules;
 
@@ -111,7 +112,7 @@ export default function App() {
              } else {
                  // Create new note only if not found
                  const newNote = {
-                    id: wn.noteId || `widget-${wn.widgetId}`,  // Use original noteId if available
+                    id: wn.noteId || Crypto.randomUUID(),  // Use UUID for new notes
                     title: wn.title,
                     content: wn.content,
                     color: wn.color,
@@ -301,7 +302,7 @@ export default function App() {
     } else {
       // Create new note
       const newNote: Note = {
-        id: `note-${Date.now()}`,
+        id: Crypto.randomUUID(),  // Use UUID for new notes
         title: editTitle || 'Untitled Note',
         content: editContent,
         created: now,
