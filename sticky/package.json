@@ -11,7 +11,7 @@
   "main": "dist-electron/main.js",
   "scripts": {
     "dev": "vite",
-    "build": "vite build && electron-builder",
+    "build": "vite build && electron-builder --publish never",
     "preview": "vite preview",
     "electron:dev": "concurrently \"vite --port 5173 --strictPort\" \"electron . --no-sandbox\"",
     "lint": "eslint src --ext .ts,.tsx"
