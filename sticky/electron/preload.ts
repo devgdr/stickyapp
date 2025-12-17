@@ -42,6 +42,7 @@ export interface ElectronAPI {
   };
   onNoteUpdated: (callback: (note: import('@stickyvault/core').Note) => void) => () => void;
   onOpenSettings: (callback: () => void) => () => void;
+  onDropboxConnected: (callback: () => void) => () => void;
 }
 
 // Expose the API to the renderer
@@ -92,6 +93,11 @@ contextBridge.exposeInMainWorld('electron', {
     const handler = () => callback();
     ipcRenderer.on('open-settings', handler);
     return () => ipcRenderer.removeListener('open-settings', handler);
+  },
+  onDropboxConnected: (callback) => {
+    const handler = () => callback();
+    ipcRenderer.on('dropbox-connected', handler);
+    return () => ipcRenderer.removeListener('dropbox-connected', handler);
   },
 } as ElectronAPI);
 

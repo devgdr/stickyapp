@@ -9,6 +9,7 @@ dist/
 build/
 release/
 release1/
+release2/
 dist-electron/
 dist-electron-ts/
 out/

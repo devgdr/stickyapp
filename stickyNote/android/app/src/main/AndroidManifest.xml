@@ -20,18 +20,11 @@
         <action android:name="android.intent.action.MAIN"/>
         <category android:name="android.intent.category.LAUNCHER"/>
       </intent-filter>
-      <!-- Dropbox OAuth callback -->
       <intent-filter>
         <action android:name="android.intent.action.VIEW"/>
         <category android:name="android.intent.category.DEFAULT"/>
         <category android:name="android.intent.category.BROWSABLE"/>
-        <data android:scheme="db-8dnmzco7eo07zai" android:host="1" android:path="/connect"/>
-      </intent-filter>
-      <!-- Expo dev client and general scheme matching -->
-      <intent-filter>
-        <action android:name="android.intent.action.VIEW"/>
-        <category android:name="android.intent.category.DEFAULT"/>
-        <category android:name="android.intent.category.BROWSABLE"/>
+        <data android:scheme="stickyvault"/>
         <data android:scheme="db-8dnmzco7eo07zai"/>
       </intent-filter>
     </activity>

@@ -32,6 +32,22 @@ export default function Settings({ isOpen, onClose }: SettingsProps) {
   const [activeTab, setActiveTab] = useState<'general' | 'dropbox' | 'about'>('general');
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
+  const [isConnected, setIsConnected] = useState(false);
+  
+  // Listen for OAuth completion
+  useEffect(() => {
+    const unsubscribe = window.electron.onDropboxConnected(() => {
+      console.log('[Settings] Received dropbox-connected event');
+      setIsConnected(true);
+      setSaveMessage('✅ Connected to Dropbox!');
+      // Refresh status from backend
+      window.electron.dropbox.getStatus().then(status => {
+        console.log('[Settings] Updated status:', status);
+        setIsConnected(status.isConnected);
+      });
+    });
+    return unsubscribe;
+  }, []);
   
   // Load settings on mount
   useEffect(() => {
@@ -43,6 +59,7 @@ export default function Settings({ isOpen, onClose }: SettingsProps) {
         startMinimized,
         syncInterval,
         vaultPath,
+        dropboxStatus,
       ] = await Promise.all([
         window.electron.settings.get<string>('dropboxAppKey'),
         window.electron.settings.get<string>('dropboxToken'),
@@ -50,6 +67,7 @@ export default function Settings({ isOpen, onClose }: SettingsProps) {
         window.electron.settings.get<boolean>('startMinimized'),
         window.electron.settings.get<number>('syncInterval'),
         window.electron.vault.getPath(),
+        window.electron.dropbox.getStatus(),
       ]);
       
       setSettings({
@@ -60,6 +78,7 @@ export default function Settings({ isOpen, onClose }: SettingsProps) {
         syncInterval: syncInterval || 15,
         vaultPath: vaultPath || '',
       });
+      setIsConnected(dropboxStatus.isConnected);
     }
     
     if (isOpen) {
@@ -135,6 +154,7 @@ export default function Settings({ isOpen, onClose }: SettingsProps) {
   const handleDisconnect = async () => {
     await window.electron.dropbox.disconnect();
     setSettings(s => ({ ...s, dropboxToken: '' }));
+    setIsConnected(false);
     setSaveMessage('Disconnected from Dropbox');
     setTimeout(() => setSaveMessage(null), 3000);
   };
@@ -257,7 +277,7 @@ export default function Settings({ isOpen, onClose }: SettingsProps) {
                 </p>
               </div>
 
-               {!settings.dropboxToken ? (
+               {!isConnected ? (
                 <div className="form-group">
                   <button
                     className="btn btn-primary btn-block"
@@ -269,6 +289,7 @@ export default function Settings({ isOpen, onClose }: SettingsProps) {
                           await window.electron.dropbox.setAppKey(settings.dropboxAppKey);
                         }
                         await window.electron.dropbox.startOAuth();
+                        setSaveMessage('Waiting for authorization...');
                       } catch (error) {
                         setSaveMessage(`Error: ${error}`);
                       }

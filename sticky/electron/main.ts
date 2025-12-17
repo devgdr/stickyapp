@@ -544,9 +544,13 @@ if (process.defaultApp) {
 const gotTheLock = app.requestSingleInstanceLock();
 
 if (!gotTheLock) {
+  console.log('[Deep Link] Could not get single instance lock, quitting');
   app.quit();
 } else {
   app.on('second-instance', (event, commandLine, workingDirectory) => {
+    console.log('[Deep Link] second-instance event fired');
+    console.log('[Deep Link] commandLine:', commandLine);
+    
     // Someone tried to run a second instance, we should focus our window.
     if (mainWindow) {
       if (mainWindow.isMinimized()) mainWindow.restore();
@@ -554,8 +558,9 @@ if (!gotTheLock) {
       mainWindow.focus();
     }
     
-    // Handle deep link on Windows
+    // Handle deep link on Windows/Linux
     const url = commandLine.find(arg => arg.startsWith('stickyvault://'));
+    console.log('[Deep Link] Found URL in commandLine:', url || 'none');
     if (url) {
       handleOpenUrl(url);
     }
@@ -563,31 +568,69 @@ if (!gotTheLock) {
 
   // Handle deep link on macOS
   app.on('open-url', (event, url) => {
+    console.log('[Deep Link] open-url event fired');
+    console.log('[Deep Link] URL:', url);
     event.preventDefault();
     handleOpenUrl(url);
   });
 }
 
 function handleOpenUrl(url: string) {
-  console.log('Received URL:', url);
+  console.log('===========================================');
+  console.log('[OAuth] handleOpenUrl called');
+  console.log('[OAuth] Full URL:', url);
+  console.log('[OAuth] Timestamp:', new Date().toISOString());
   
   if (url.startsWith('stickyvault://oauth/callback')) {
-    const urlObj = new URL(url);
-    const code = urlObj.searchParams.get('code');
+    console.log('[OAuth] URL matches callback pattern');
     
-    if (code) {
-      dropboxSync.completeOAuth(code)
-        .then(success => {
-          if (success) {
-            mainWindow?.webContents.send('dropbox-connected');
-            if (mainWindow && !mainWindow.isVisible()) {
-              mainWindow.show();
+    try {
+      const urlObj = new URL(url);
+      console.log('[OAuth] URL parsed successfully');
+      console.log('[OAuth] Search params:', urlObj.searchParams.toString());
+      
+      const code = urlObj.searchParams.get('code');
+      const error = urlObj.searchParams.get('error');
+      const errorDescription = urlObj.searchParams.get('error_description');
+      
+      console.log('[OAuth] Code:', code ? `${code.substring(0, 10)}...` : 'null');
+      console.log('[OAuth] Error:', error);
+      console.log('[OAuth] Error Description:', errorDescription);
+      
+      if (error) {
+        console.error('[OAuth] Dropbox returned error:', error, errorDescription);
+        mainWindow?.webContents.send('dropbox-error', { error, errorDescription });
+        return;
+      }
+      
+      if (code) {
+        console.log('[OAuth] Starting completeOAuth with code...');
+        dropboxSync.completeOAuth(code)
+          .then(success => {
+            console.log('[OAuth] completeOAuth result:', success);
+            if (success) {
+              console.log('[OAuth] SUCCESS - Sending dropbox-connected event');
+              mainWindow?.webContents.send('dropbox-connected');
+              if (mainWindow && !mainWindow.isVisible()) {
+                mainWindow.show();
+              }
+            } else {
+              console.error('[OAuth] completeOAuth returned false');
             }
-          }
-        })
-        .catch(console.error);
+          })
+          .catch(err => {
+            console.error('[OAuth] completeOAuth threw error:', err);
+          });
+      } else {
+        console.error('[OAuth] No code found in callback URL');
+      }
+    } catch (parseError) {
+      console.error('[OAuth] Failed to parse URL:', parseError);
     }
+  } else {
+    console.log('[OAuth] URL does not match callback pattern');
   }
+  console.log('===========================================');
 }
 
 app.on('window-all-closed', () => {

@@ -78,62 +78,142 @@ export class DropboxService {
   }
 
   /**
-   * Start the OAuth Authorization Code flow
+   * Start the OAuth Authorization Code flow with PKCE
    */
   async startAuth(): Promise<boolean> {
+    console.log('===========================================');
+    console.log('[DropboxService] startAuth called');
+    
     if (!this.clientId) {
-        console.error('Dropbox App Key is not set');
-        // UI should prompt for key if this returns false and logic handles it
+        console.error('[DropboxService] ERROR: Dropbox App Key is not set');
         return false;
     }
+    
     const clientId = this.clientId;
+    console.log('[DropboxService] Using App Key:', clientId);
     
     // Use Dropbox's official redirect URI format for mobile apps
-    // Format: db-<APP_KEY>://1/connect (matches AndroidManifest intent filter)
     this.redirectUri = `db-${clientId}://1/connect`;
     console.log('[DropboxService] Redirect URI:', this.redirectUri);
+    console.log('[DropboxService] ⚠️ Make sure this EXACT URI is added to your Dropbox App Console!');
 
     try {
-      // 1. Open Browser for Auth
-      // Dropbox "Code Flow": response_type=code, token_access_type=offline (for refresh token)
+      // Generate PKCE code_verifier and code_challenge (required for public clients)
+      const codeVerifier = this.generateRandomString(128);
+      const codeChallenge = await this.generateCodeChallenge(codeVerifier);
+      
+      console.log('[DropboxService] Generated PKCE challenge');
+      
+      // Build auth URL with PKCE
       const authUrl = `https://www.dropbox.com/oauth2/authorize` +
         `?client_id=${encodeURIComponent(clientId)}` +
         `&response_type=code` +
+        `&redirect_uri=${encodeURIComponent(this.redirectUri)}` +
         `&token_access_type=offline` +
-        `&redirect_uri=${encodeURIComponent(this.redirectUri)}`;
+        `&code_challenge=${encodeURIComponent(codeChallenge)}` +
+        `&code_challenge_method=S256`;
 
-      console.log('[DropboxService] Opening Auth Session...');
+      console.log('[DropboxService] Opening Auth Session with PKCE...');
+      console.log('[DropboxService] Auth URL:', authUrl);
+      
       const result = await WebBrowser.openAuthSessionAsync(authUrl, this.redirectUri);
+      
+      console.log('[DropboxService] Auth result type:', result.type);
 
       if (result.type === 'success' && result.url) {
-        // 2. Parse Code from redirect
-        // URL will be something like: stickyvault://dropbox-auth?code=...
+        console.log('[DropboxService] Success! Callback URL:', result.url);
+        
         const urlParams = new URLSearchParams(result.url.split('?')[1]);
         const code = urlParams.get('code');
+        const error = urlParams.get('error');
+        const errorDescription = urlParams.get('error_description');
+
+        console.log('[DropboxService] Parsed code:', code ? `${code.substring(0, 10)}...` : 'null');
+        console.log('[DropboxService] Error:', error);
+        console.log('[DropboxService] Error Description:', errorDescription);
+
+        if (error) {
+          console.error('[DropboxService] Dropbox returned error:', error, errorDescription);
+          return false;
+        }
 
         if (code) {
-          console.log('[DropboxService] Got code. Exchanging for tokens...');
+          console.log('[DropboxService] Got code. Exchanging for tokens with PKCE...');
           
-          // 3. Exchange Code for Tokens (Access + Refresh)
-          const response = await exchangeCodeAsync({
-              clientId: clientId,
+          // Exchange code for tokens with PKCE
+          const tokenResponse = await fetch('https://api.dropboxapi.com/oauth2/token', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: new URLSearchParams({
               code,
-              redirectUri: this.redirectUri,
-          }, { 
-              tokenEndpoint: 'https://api.dropboxapi.com/oauth2/token' 
+              grant_type: 'authorization_code',
+              client_id: clientId,
+              redirect_uri: this.redirectUri,
+              code_verifier: codeVerifier,
+            }).toString(),
           });
 
-          this.tokenResponse = response;
+          if (!tokenResponse.ok) {
+            const errorText = await tokenResponse.text();
+            console.error('[DropboxService] Token exchange failed:', errorText);
+            return false;
+          }
+
+          const tokenData = await tokenResponse.json();
+          
+          const config: TokenResponseConfig = {
+            accessToken: tokenData.access_token,
+            tokenType: tokenData.token_type,
+            expiresIn: tokenData.expires_in,
+            refreshToken: tokenData.refresh_token,
+            scope: tokenData.scope,
+          };
+          
+          this.tokenResponse = new TokenResponse(config);
           await this.saveToken();
-          console.log('[DropboxService] Auth successful!');
+          console.log('[DropboxService] Auth successful! Token saved.');
+          console.log('===========================================');
           return true;
         }
+      } else if (result.type === 'cancel') {
+        console.log('[DropboxService] User cancelled auth');
+      } else if (result.type === 'dismiss') {
+        console.log('[DropboxService] Auth dismissed');
+      } else {
+        console.log('[DropboxService] Auth result:', JSON.stringify(result));
       }
+      
+      console.log('===========================================');
       return false;
     } catch (e) {
-      console.error('[DropboxService] Auth failed', e);
+      console.error('[DropboxService] Auth failed with exception:', e);
+      console.log('===========================================');
       return false;
     }
+  }
+
+  private generateRandomString(length: number): string {
+    const possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~';
+    let text = '';
+    for (let i = 0; i < length; i++) {
+      text += possible.charAt(Math.floor(Math.random() * possible.length));
+    }
+    return text;
+  }
+
+  private async generateCodeChallenge(codeVerifier: string): Promise<string> {
+    const digest = await Crypto.digestStringAsync(
+      Crypto.CryptoDigestAlgorithm.SHA256,
+      codeVerifier,
+      { encoding: Crypto.CryptoEncoding.BASE64 }
+    );
+    // Convert to URL-safe base64
+    return digest
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=/g, '');
   }
 
   private async saveToken() {
